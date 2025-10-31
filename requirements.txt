@@ -1,0 +1,11 @@
+
+fastapi==0.120.0
+fastapi_users==15.0.1
+SQLAlchemy==2.0.44
+sqlmodel==0.0.27
+uvicorn[standard]==0.29.0
+psycopg2-binary  
+asyncpg  
+fastapi-users[sqlalchemy] 
+pytest>=7.0.0
+python-dotenv
