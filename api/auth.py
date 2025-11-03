@@ -5,7 +5,6 @@ from models.models import Account
 
 router = APIRouter()
 
-# Pydantic schemas
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -14,8 +13,13 @@ class LoginResponse(BaseModel):
     success: bool
     message: str
     username: str | None = None
+    role: str | None = None
+    user_id: int | None = None
 
-# Dependency
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+
 def get_session():
     from core.database import engine
     with Session(engine) as session:
@@ -23,9 +27,6 @@ def get_session():
 
 @router.post("/login", response_model=LoginResponse)
 def login(request: LoginRequest, db: Session = Depends(get_session)):
-    """
-    Đăng nhập đơn giản - check username/password
-    """
     account = db.exec(
         select(Account).where(
             Account.username == request.username,
@@ -39,15 +40,13 @@ def login(request: LoginRequest, db: Session = Depends(get_session)):
     return LoginResponse(
         success=True,
         message="Đăng nhập thành công",
-        username=account.username
+        username=account.username,
+        role=account.role,
+        user_id=account.id
     )
 
 @router.post("/register")
-def register(request: LoginRequest, db: Session = Depends(get_session)):
-    """
-    Đăng ký tài khoản mới
-    """
-    # Check username đã tồn tại chưa
+def register(request: RegisterRequest, db: Session = Depends(get_session)):
     existing = db.exec(
         select(Account).where(Account.username == request.username)
     ).first()
@@ -55,12 +54,17 @@ def register(request: LoginRequest, db: Session = Depends(get_session)):
     if existing:
         raise HTTPException(status_code=400, detail="Username đã tồn tại")
     
-    # Tạo account mới
     new_account = Account(
         username=request.username,
-        password=request.password
+        password=request.password,
+        role="user"
     )
     db.add(new_account)
     db.commit()
+    db.refresh(new_account)
     
-    return {"success": True, "message": "Đăng ký thành công"}
+    return {
+        "success": True, 
+        "message": "Đăng ký thành công",
+        "user_id": new_account.id
+    }

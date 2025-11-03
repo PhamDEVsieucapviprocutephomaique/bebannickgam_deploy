@@ -6,7 +6,6 @@ from models.models import GameNick
 
 router = APIRouter()
 
-# Pydantic schemas
 class GameNickCreate(BaseModel):
     title: str
     category: str
@@ -14,6 +13,7 @@ class GameNickCreate(BaseModel):
     details: str
     facebook_link: str = "https://www.facebook.com/letuan089"
     images: List[str] = []
+    owner_id: int = 1  # Mặc định
 
 class GameNickResponse(BaseModel):
     id: int
@@ -23,12 +23,9 @@ class GameNickResponse(BaseModel):
     details: str
     facebook_link: str
     images: List[str]
+    owner_id: int
     created_at: str
 
-    class Config:
-        from_attributes = True
-
-# Dependency
 def get_session():
     from core.database import engine
     with Session(engine) as session:
@@ -36,16 +33,14 @@ def get_session():
 
 @router.post("/", response_model=GameNickResponse)
 def create_game_nick(nick: GameNickCreate, db: Session = Depends(get_session)):
-    """
-    Thêm nick game mới
-    """
     new_nick = GameNick(
         title=nick.title,
         category=nick.category,
         price=nick.price,
         details=nick.details,
         facebook_link=nick.facebook_link,
-        images=nick.images
+        images=nick.images,
+        owner_id=nick.owner_id
     )
     db.add(new_nick)
     db.commit()
@@ -59,16 +54,13 @@ def create_game_nick(nick: GameNickCreate, db: Session = Depends(get_session)):
         details=new_nick.details,
         facebook_link=new_nick.facebook_link,
         images=new_nick.images,
+        owner_id=new_nick.owner_id,
         created_at=new_nick.created_at.isoformat()
     )
 
 @router.get("/", response_model=List[GameNickResponse])
 def get_all_game_nicks(db: Session = Depends(get_session)):
-    """
-    Lấy tất cả game nicks
-    """
     nicks = db.exec(select(GameNick).order_by(GameNick.created_at.desc())).all()
-    
     return [
         GameNickResponse(
             id=nick.id,
@@ -78,66 +70,23 @@ def get_all_game_nicks(db: Session = Depends(get_session)):
             details=nick.details,
             facebook_link=nick.facebook_link,
             images=nick.images,
+            owner_id=nick.owner_id,
             created_at=nick.created_at.isoformat()
         )
         for nick in nicks
     ]
 
-@router.get("/{nick_id}", response_model=GameNickResponse)
-def get_game_nick(nick_id: int, db: Session = Depends(get_session)):
-    """
-    Lấy chi tiết 1 nick
-    """
+@router.delete("/{nick_id}")
+def delete_game_nick(nick_id: int, current_user_id: int = 1, db: Session = Depends(get_session)):
     nick = db.get(GameNick, nick_id)
     if not nick:
         raise HTTPException(status_code=404, detail="Nick không tồn tại")
     
-    return GameNickResponse(
-        id=nick.id,
-        title=nick.title,
-        category=nick.category,
-        price=nick.price,
-        details=nick.details,
-        facebook_link=nick.facebook_link,
-        images=nick.images,
-        created_at=nick.created_at.isoformat()
-    )
-
-@router.delete("/{nick_id}")
-def delete_game_nick(nick_id: int, db: Session = Depends(get_session)):
-    """
-    Xóa nick game
-    """
-    nick = db.get(GameNick, nick_id)
-    if not nick:
-        raise HTTPException(status_code=404, detail="Nick không tồn tại")
+    # Check permission: chỉ owner hoặc admin (user_id=1) được xóa
+    if nick.owner_id != current_user_id and current_user_id != 1:
+        raise HTTPException(status_code=403, detail="Không có quyền xóa nick này")
     
     db.delete(nick)
     db.commit()
     
     return {"success": True, "message": "Xóa thành công"}
-
-@router.get("/category/{category_name}", response_model=List[GameNickResponse])
-def get_nicks_by_category(category_name: str, db: Session = Depends(get_session)):
-    """
-    Lấy nicks theo category
-    """
-    nicks = db.exec(
-        select(GameNick)
-        .where(GameNick.category == category_name)
-        .order_by(GameNick.created_at.desc())
-    ).all()
-    
-    return [
-        GameNickResponse(
-            id=nick.id,
-            title=nick.title,
-            category=nick.category,
-            price=nick.price,
-            details=nick.details,
-            facebook_link=nick.facebook_link,
-            images=nick.images,
-            created_at=nick.created_at.isoformat()
-        )
-        for nick in nicks
-    ]

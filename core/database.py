@@ -2,9 +2,19 @@ from sqlmodel import SQLModel, create_engine, Session
 import os
 from dotenv import load_dotenv
 
+
+
+
+
+
+
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+# DATABASE_URL="postgresql://user:28092004@localhost:7004/trending_db"
+
+
+
 
 print(f"DEBUG: DATABASE_URL value is: {DATABASE_URL}")
 
